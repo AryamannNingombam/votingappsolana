@@ -81,6 +81,47 @@ pub mod votingapp {
         }
         Ok(())
     }
+    pub fn vote(ctx: Context<Vote>, voter_address: Pubkey, proposal_index: i8) -> ProgramResult {
+        let base_account = &mut ctx.accounts.base_account;
+        let sender = &mut base_account.voters.get_mut(&voter_address).unwrap();
+        if (sender.voted) {
+            println!("Voter has already voted!");
+            return Err(ProgramError::InvalidArgument);
+        }
+        if (sender.weight == 0) {
+            println!("Voter has no right to vote");
+            return Err(ProgramError::InvalidArgument);
+        }
+        sender.voted = true;
+        sender.vote = proposal_index;
+        base_account.proposals[proposal_index as usize].vote_count += sender.weight;
+        Ok(())
+    }
+    pub fn winner_name(ctx: Context<WinningProposal>) -> ProgramResult {
+        let mut winning_vote_count = 0;
+        let mut result = 0;
+        for (index, proposal) in ctx.accounts.base_account.proposals.iter().enumerate() {
+            if proposal.vote_count > winning_vote_count {
+                winning_vote_count = proposal.vote_count;
+                result = index;
+            }
+        }
+        let winner = ctx.accounts.base_account.proposals[result].name.clone();
+        println!("{}", winner);
+        ctx.accounts.base_account.winner = winner;
+        Ok(())
+    }
+}
+#[derive(Accounts)]
+pub struct WinningProposal<'info> {
+    #[account(mut)]
+    pub base_account: Account<'info, AccountDetails>,
+}
+
+#[derive(Accounts)]
+pub struct Vote<'info> {
+    #[account(mut)]
+    pub base_account: Account<'info, AccountDetails>,
 }
 
 #[derive(Accounts)]
@@ -123,4 +164,5 @@ pub struct AccountDetails {
     pub chairperson: Pubkey,
     pub voters: HashMap<Pubkey, Voter>,
     pub proposals: Vec<Proposal>,
+    pub winner: String,
 }
